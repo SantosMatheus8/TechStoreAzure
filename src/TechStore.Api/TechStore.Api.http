@@ -1,0 +1,89 @@
+@baseUrl = http://localhost:5000
+
+### Health Check
+GET {{baseUrl}}/health
+
+### ==================== CATEGORIAS ====================
+
+### Listar categorias
+GET {{baseUrl}}/api/categorias?page=1&pageSize=10
+
+### Buscar categoria por nome
+GET {{baseUrl}}/api/categorias?nome=Notebooks
+
+### Buscar categoria por ID
+GET {{baseUrl}}/api/categorias/a1b2c3d4-0001-0001-0001-000000000001
+
+### Criar categoria
+POST {{baseUrl}}/api/categorias
+Content-Type: application/json
+
+{
+  "nome": "Acessórios",
+  "descricao": "Capas, cabos, suportes e outros acessórios"
+}
+
+### Atualizar categoria
+PUT {{baseUrl}}/api/categorias/a1b2c3d4-0001-0001-0001-000000000001
+Content-Type: application/json
+
+{
+  "nome": "Notebooks e Laptops",
+  "descricao": "Notebooks e laptops para uso pessoal e profissional"
+}
+
+### Excluir categoria (soft delete)
+DELETE {{baseUrl}}/api/categorias/a1b2c3d4-0001-0001-0001-000000000004
+
+### ==================== PRODUTOS ====================
+
+### Listar produtos
+GET {{baseUrl}}/api/produtos?page=1&pageSize=10
+
+### Buscar produtos por nome
+GET {{baseUrl}}/api/produtos?nome=Notebook
+
+### Filtrar produtos por categoria
+GET {{baseUrl}}/api/produtos?categoriaId=a1b2c3d4-0001-0001-0001-000000000002
+
+### Buscar produto por ID
+GET {{baseUrl}}/api/produtos/b1b2c3d4-0002-0001-0001-000000000001
+
+### Criar produto
+POST {{baseUrl}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Webcam Logitech C920",
+  "descricao": "Webcam Full HD 1080p com microfone integrado",
+  "preco": 349.90,
+  "estoque": 20,
+  "categoriaId": "a1b2c3d4-0001-0001-0001-000000000002"
+}
+
+### Criar produto com categoria inexistente (deve retornar 422)
+POST {{baseUrl}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Produto Teste",
+  "descricao": "Teste de categoria inválida",
+  "preco": 99.90,
+  "estoque": 5,
+  "categoriaId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Atualizar produto
+PUT {{baseUrl}}/api/produtos/b1b2c3d4-0002-0001-0001-000000000001
+Content-Type: application/json
+
+{
+  "nome": "Notebook Dell Inspiron 15 (Atualizado)",
+  "descricao": "Notebook Dell com processador Intel Core i7, 16GB RAM, SSD 512GB - Promoção",
+  "preco": 3999.99,
+  "estoque": 20,
+  "categoriaId": "a1b2c3d4-0001-0001-0001-000000000001"
+}
+
+### Excluir produto (soft delete)
+DELETE {{baseUrl}}/api/produtos/b1b2c3d4-0002-0001-0001-000000000010

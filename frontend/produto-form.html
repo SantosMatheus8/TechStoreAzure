@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechStore Cloud - Produto</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <h1>TechStore Cloud</h1>
+        <nav>
+            <a href="index.html" class="active">Produtos</a>
+            <a href="categorias.html">Categorias</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="alert-container"></div>
+
+        <div class="card">
+            <h2 id="form-title">Novo Produto</h2>
+            <br>
+
+            <form id="product-form">
+                <div class="form-group">
+                    <label for="nome">Nome *</label>
+                    <input type="text" id="nome" required maxlength="200">
+                </div>
+
+                <div class="form-group">
+                    <label for="descricao">Descrição</label>
+                    <textarea id="descricao" maxlength="1000"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="preco">Preço (R$) *</label>
+                        <input type="number" id="preco" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="estoque">Estoque *</label>
+                        <input type="number" id="estoque" min="0" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoriaId">Categoria *</label>
+                    <select id="categoriaId" required>
+                        <option value="">Selecione uma categoria</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="submit-btn">Salvar</button>
+                    <a href="index.html" class="btn btn-outline">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        let editId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            editId = params.get('id');
+
+            loadCategories();
+
+            if (editId) {
+                document.getElementById('form-title').textContent = 'Editar Produto';
+                loadProduct(editId);
+            }
+        });
+
+        document.getElementById('product-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveProduct();
+        });
+
+        async function loadCategories() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/categorias?pageSize=50`);
+                if (!res.ok) throw new Error('Erro ao carregar categorias');
+                const data = await res.json();
+                const select = document.getElementById('categoriaId');
+                data.items.forEach(cat => {
+                    if (!cat.ativo) return;
+                    const opt = document.createElement('option');
+                    opt.value = cat.id;
+                    opt.textContent = cat.nome;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                showAlert('Erro ao carregar categorias: ' + err.message, 'error');
+            }
+        }
+
+        async function loadProduct(id) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/produtos/${id}`);
+                if (!res.ok) throw new Error('Produto não encontrado');
+                const p = await res.json();
+                document.getElementById('nome').value = p.nome;
+                document.getElementById('descricao').value = p.descricao;
+                document.getElementById('preco').value = p.preco;
+                document.getElementById('estoque').value = p.estoque;
+
+                setTimeout(() => {
+                    document.getElementById('categoriaId').value = p.categoriaId;
+                }, 500);
+            } catch (err) {
+                showAlert('Erro ao carregar produto: ' + err.message, 'error');
+            }
+        }
+
+        async function saveProduct() {
+            const body = {
+                nome: document.getElementById('nome').value.trim(),
+                descricao: document.getElementById('descricao').value.trim(),
+                preco: parseFloat(document.getElementById('preco').value),
+                estoque: parseInt(document.getElementById('estoque').value),
+                categoriaId: document.getElementById('categoriaId').value
+            };
+
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+
+            try {
+                const url = editId
+                    ? `${API_BASE_URL}/api/produtos/${editId}`
+                    : `${API_BASE_URL}/api/produtos`;
+
+                const res = await fetch(url, {
+                    method: editId ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    const msgs = err.errors
+                        ? Object.values(err.errors).flat().join(', ')
+                        : err.detail || 'Erro desconhecido';
+                    throw new Error(msgs);
+                }
+
+                window.location.href = 'index.html?msg=' + encodeURIComponent(
+                    editId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!'
+                );
+            } catch (err) {
+                showAlert(err.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Salvar';
+            }
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+[Unit]
+Description=TechStore API
+After=network.target
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/techstore-api
+ExecStart=/usr/bin/dotnet /opt/techstore-api/TechStore.Api.dll
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=techstore-api
+TimeoutStopSec=30
+
+# Variáveis de ambiente - substitua os valores reais
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+Environment=ConnectionStrings__DefaultConnection=Server=<AZURE_SQL_SERVER>.database.windows.net;Database=techstoredb;User Id=<SQL_ADMIN_USER>;Password=<SQL_ADMIN_PASSWORD>;Encrypt=True;TrustServerCertificate=False;
+Environment=ApplicationInsights__ConnectionString=<APPLICATION_INSIGHTS_CONNECTION_STRING>
+Environment=AllowedOrigins=https://<STORAGE_ACCOUNT>.z15.web.core.windows.net
+
+[Install]
+WantedBy=multi-user.target
