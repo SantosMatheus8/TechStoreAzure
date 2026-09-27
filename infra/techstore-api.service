@@ -3,7 +3,7 @@ Description=TechStore API
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/techstore-api
@@ -14,12 +14,10 @@ KillSignal=SIGINT
 SyslogIdentifier=techstore-api
 TimeoutStopSec=30
 
-# Variáveis de ambiente - substitua os valores reais
 Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
-Environment=ConnectionStrings__DefaultConnection=Server=<AZURE_SQL_SERVER>.database.windows.net;Database=techstoredb;User Id=<SQL_ADMIN_USER>;Password=<SQL_ADMIN_PASSWORD>;Encrypt=True;TrustServerCertificate=False;
-Environment=ApplicationInsights__ConnectionString=<APPLICATION_INSIGHTS_CONNECTION_STRING>
-Environment=AllowedOrigins=https://<STORAGE_ACCOUNT>.z15.web.core.windows.net
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+Environment=KeyVault__Uri=https://kv-techstore-matheus.vault.azure.net/
+Environment=AllowedOrigins=https://sttechstore31459.z9.web.core.windows.net
 
 [Install]
 WantedBy=multi-user.target

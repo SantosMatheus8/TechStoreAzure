@@ -11,6 +11,8 @@ artifacts/
 ## Secrets / local settings
 appsettings.Development.json
 .env
+.env.*
+!.env.example
 
 ## OS
 .DS_Store

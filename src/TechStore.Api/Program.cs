@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TechStore.Api.Middleware;
@@ -5,6 +6,13 @@ using TechStore.Api.Modules.Catalog;
 using TechStore.Api.Modules.Categories;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Key Vault — deve ser o primeiro provider para que Serilog e módulos já leiam os segredos
+var keyVaultUri = builder.Configuration["KeyVault:Uri"];
+if (!string.IsNullOrWhiteSpace(keyVaultUri))
+{
+    builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), new DefaultAzureCredential());
+}
 
 // Serilog
 builder.Host.UseSerilog((context, config) =>
@@ -87,11 +95,10 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseCors();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Em produção real, o Swagger ficaria desabilitado ou protegido por autenticação.
+// Como este é um MVP acadêmico, mantemos habilitado para facilitar testes e capturas de tela.
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.MapHealthChecks("/health");
 
