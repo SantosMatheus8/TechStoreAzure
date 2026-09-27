@@ -92,11 +92,11 @@ jobs:
           set -e
           APP=/opt/techstore-api
           URL=$(echo '__PKG_URL_B64__' | base64 -d)
-          curl -fsSL "$URL" -o /tmp/techstore-api.tar.gz
+          curl -fsSL "$URL" -o /var/lib/techstore-deploy.tar.gz
           rm -rf ${APP}.bak && cp -a $APP ${APP}.bak
           systemctl stop techstore-api
           find $APP -mindepth 1 -delete
-          tar -xzf /tmp/techstore-api.tar.gz -C $APP
+          tar -xzf /var/lib/techstore-deploy.tar.gz -C $APP
           chown -R www-data:www-data $APP
           systemctl start techstore-api
           for i in $(seq 1 30); do
