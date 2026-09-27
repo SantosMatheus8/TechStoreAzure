@@ -1,0 +1,129 @@
+name: CI/CD TechStore
+
+on:
+  push:
+    branches: [master]
+    paths-ignore: ['docs/**', '**.md']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # necessário para login OIDC na Azure (sem senha)
+  contents: read
+
+env:
+  RESOURCE_GROUP: rg-techstore-mvp
+  VM_NAME: vm-techstore
+  STORAGE_ACCOUNT: sttechstore31459
+  DEPLOY_CONTAINER: deploy
+  API_URL: https://techstore-matheus.spaincentral.cloudapp.azure.com
+  FRONTEND_URL: https://sttechstore31459.z9.web.core.windows.net
+
+jobs:
+  build-test:
+    name: Build e testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore TechStore.sln
+
+      - name: Build
+        run: dotnet build TechStore.sln -c Release --no-restore
+
+      - name: Testes unitários
+        run: dotnet test TechStore.sln -c Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Guardar resultado dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+
+      - name: Gerar pacote da API (linux-x64)
+        run: bash infra/publish.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-package
+          path: artifacts/techstore-api.tar.gz
+
+  deploy:
+    name: Deploy na Azure
+    needs: build-test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-package
+
+      - name: Login na Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Enviar pacote para o Storage (container privado)
+        run: |
+          BLOB="techstore-api-${GITHUB_SHA::7}-${GITHUB_RUN_NUMBER}.tar.gz"
+          az storage blob upload --account-name $STORAGE_ACCOUNT -c $DEPLOY_CONTAINER -n "$BLOB" \
+            -f techstore-api.tar.gz --auth-mode key --overwrite --only-show-errors -o none
+          EXPIRY=$(date -u -d '+30 minutes' +%Y-%m-%dT%H:%MZ)
+          SAS_URL=$(az storage blob generate-sas --account-name $STORAGE_ACCOUNT -c $DEPLOY_CONTAINER -n "$BLOB" \
+            --permissions r --expiry $EXPIRY --https-only --full-uri --auth-mode key --only-show-errors -o tsv)
+          echo "::add-mask::$SAS_URL"
+          echo "PKG_URL_B64=$(printf %s "$SAS_URL" | base64 -w0)" >> $GITHUB_ENV
+
+      - name: Deploy da API na VM (Run Command, sem SSH)
+        run: |
+          cat > deploy.sh <<'EOF'
+          #!/bin/bash
+          set -e
+          APP=/opt/techstore-api
+          URL=$(echo '__PKG_URL_B64__' | base64 -d)
+          curl -fsSL "$URL" -o /tmp/techstore-api.tar.gz
+          rm -rf ${APP}.bak && cp -a $APP ${APP}.bak
+          systemctl stop techstore-api
+          find $APP -mindepth 1 -delete
+          tar -xzf /tmp/techstore-api.tar.gz -C $APP
+          chown -R www-data:www-data $APP
+          systemctl start techstore-api
+          for i in $(seq 1 30); do
+            if curl -fs http://127.0.0.1:5000/health > /dev/null; then echo "DEPLOY_OK"; exit 0; fi
+            sleep 2
+          done
+          echo "Health check falhou - executando rollback"
+          systemctl stop techstore-api
+          find $APP -mindepth 1 -delete
+          cp -a ${APP}.bak/. $APP/
+          systemctl start techstore-api
+          echo "DEPLOY_FAILED"
+          exit 1
+          EOF
+          sed -i "s|__PKG_URL_B64__|${PKG_URL_B64}|" deploy.sh
+          OUT=$(az vm run-command invoke -g $RESOURCE_GROUP -n $VM_NAME --command-id RunShellScript \
+            --scripts @deploy.sh --query "value[0].message" -o tsv)
+          echo "$OUT"
+          grep -q "DEPLOY_OK" <<< "$OUT"
+
+      - name: Publicar frontend (Blob Static Website)
+        run: |
+          az storage blob upload-batch --account-name $STORAGE_ACCOUNT -d '$web' -s frontend \
+            --overwrite --auth-mode key --only-show-errors -o none
+
+      - name: Smoke test
+        run: |
+          echo "API:"; curl -fsS "$API_URL/health"; echo
+          echo "Produtos:"; curl -fsS "$API_URL/api/produtos?pageSize=1" | head -c 200; echo
+          echo "Frontend:"; curl -fsS -o /dev/null -w "HTTP %{http_code}\n" "$FRONTEND_URL"
